@@ -1,6 +1,6 @@
 import { Sequelize, ModelDefined, DataTypes } from 'sequelize';
 
-interface TeamsMembersAttributes {
+export interface TeamsMembersAttributes {
   id: number;
   idTeam: number;
   user: string;
@@ -8,7 +8,7 @@ interface TeamsMembersAttributes {
   bridgeMnemonic: string;
 }
 
-export type TeamMemberModel = ModelDefined<TeamsMembersAttributes, TeamsMembersAttributes>;
+export type TeamMemberModel = ModelDefined<TeamsMembersAttributes, Omit<TeamsMembersAttributes, 'id'>>;
 
 export default (database: Sequelize): TeamMemberModel => {
   const TeamMember: TeamMemberModel = database.define(

@@ -1,6 +1,6 @@
 import { Sequelize, ModelDefined, DataTypes } from 'sequelize';
 
-interface TeamAttributes {
+export interface TeamAttributes {
   id: number;
   admin: string;
   name: string;
@@ -10,7 +10,7 @@ interface TeamAttributes {
   totalMembers: number;
 }
 
-export type TeamModel = ModelDefined<TeamAttributes, TeamAttributes>;
+export type TeamModel = ModelDefined<TeamAttributes, Omit<TeamAttributes, 'id'>>;
 
 export default (database: Sequelize): TeamModel => {
   const Team: TeamModel = database.define(
