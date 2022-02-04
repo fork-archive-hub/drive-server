@@ -139,7 +139,8 @@ export default (router: Router, service: any, App: any): Router => {
     }
 
     const keys = await service.KeyServer.getKeys(userData);
-    const hasTeams = !!(await service.Team.getTeamByMember(req.body.email));
+    const team = await service.teamsService.getMemberTeam(req.body.email);
+    const hasTeams = !!team;
     const appSumoDetails = await service.AppSumo.GetDetails(userData.id).catch(() => null);
 
     const user = {
@@ -171,16 +172,14 @@ export default (router: Router, service: any, App: any): Router => {
       backupsBucket: userData.backupsBucket,
     };
 
-    const userTeam = null;
-    // TODO: Not working. Team members can not use team workspace due to this
-    // if (userTeam) {
-    //   const tokenTeam = Sign(userTeam.bridge_user, App.config.get('secrets').JWT, internxtClient === 'drive-web');
+    if (hasTeams) {
+      const tokenTeam = Sign(team.bridgeUser, App.config.get('secrets').JWT, internxtClient === 'drive-web');
 
-    //   return res.status(200).json({
-    //     user, token, userTeam, tokenTeam
-    //   });
-    // }
-    return res.status(200).json({ user, token, userTeam, newToken });
+      return res.status(200).json({
+        user, token, userTeam: team, tokenTeam
+      });
+    }
+    return res.status(200).json({ user, token, userTeam: null, newToken });
   });
 
   router.get('/user/refresh', passportAuth, async (req, res) => {
