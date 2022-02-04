@@ -20,7 +20,7 @@ export default (database: Sequelize): TeamMemberModel => {
         allowNull: false,
         autoIncrement: true,
       },
-      id_team: {
+      idTeam: {
         type: DataTypes.INTEGER,
         allowNull: false,
       },
@@ -28,11 +28,11 @@ export default (database: Sequelize): TeamMemberModel => {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      bridge_password: {
+      bridgePassword: {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      bridge_mnemonic: {
+      bridgeMnemonic: {
         type: DataTypes.STRING,
         allowNull: false,
       },

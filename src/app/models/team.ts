@@ -22,14 +22,27 @@ export default (database: Sequelize): TeamModel => {
         allowNull: false,
         autoIncrement: true,
       },
-      admin: DataTypes.STRING,
-      name: DataTypes.STRING,
-      bridge_user: DataTypes.STRING,
-      bridge_password: DataTypes.STRING,
-      bridge_mnemonic: DataTypes.STRING,
-      total_members: DataTypes.INTEGER,
+      admin: {
+        type: DataTypes.STRING
+      },
+      name: {
+        type: DataTypes.STRING
+      },
+      bridgeUser: {
+        type: DataTypes.STRING
+      },
+      bridgePassword: {
+        type: DataTypes.STRING
+      },
+      bridgeMnemonic: {
+        type: DataTypes.STRING
+      },
+      totalMembers: {
+        type: DataTypes.STRING
+      },
     },
     {
+      tableName: 'teams',
       timestamps: false,
       underscored: true,
     },
