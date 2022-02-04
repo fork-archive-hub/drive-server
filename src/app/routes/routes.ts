@@ -21,7 +21,7 @@ import NewsletterRoutes from './newsletter';
 import UserRoutes from './user';
 import AnalyticsRoutes from './analytics';
 import { Sign, passportAuth } from '../middleware/passport';
-import TeamsRoutes from './teams';
+import TeamsRoutes from './teamsController';
 import logger from '../../lib/logger';
 import * as ReCaptchaV3 from '../../lib/recaptcha';
 import * as AnalyticsService from '../../lib/analytics/AnalyticsService';
