@@ -17,6 +17,12 @@ export class TeamNotFoundError extends Error {
   }
 }
 
+export class UserDoesNotHaveTeamError extends Error {
+  constructor() {
+    super('User does not have team');
+  }
+}
+
 export class TeamsService {
   private readonly teamsRepository: TeamsRepository;
   private readonly teamsMembersRepository: TeamsMembersRepository;
@@ -30,8 +36,34 @@ export class TeamsService {
     await this.teamsRepository.updateOne(updatedData, { admin: adminEmail });
   }
 
+  async getTeamByBridgeUser(bridgeUser: string): Promise<TeamAttributes> {
+    const team = await this.teamsRepository.findOne({ bridgeUser });
+
+    if (!team) {
+      throw new TeamNotFoundError();
+    }
+
+    return team;
+  }
+
   async getAdminTeam(adminEmail: string): Promise<TeamAttributes> {
     const team = await this.teamsRepository.findOne({ admin: adminEmail });
+
+    if (!team) {
+      throw new TeamNotFoundError();
+    }
+
+    return team;
+  }
+
+  async getMemberTeam(memberEmail: string): Promise<TeamAttributes> {
+    const teamMember = await this.teamsMembersRepository.findOne({ user: memberEmail });
+
+    if (!teamMember) {
+      throw new UserDoesNotHaveTeamError();
+    }
+
+    const team = await this.teamsRepository.findOne({ id: teamMember.idTeam });
 
     if (!team) {
       throw new TeamNotFoundError();
