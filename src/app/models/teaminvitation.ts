@@ -1,6 +1,6 @@
 import { Sequelize, ModelDefined, DataTypes } from 'sequelize';
 
-interface TeamInvitationAttributes {
+export interface TeamInvitationAttributes {
   id: number;
   idTeam: number;
   user: string;
@@ -9,7 +9,7 @@ interface TeamInvitationAttributes {
   mnemonic: string;
 }
 
-export type TeamInvitationModel = ModelDefined<TeamInvitationAttributes, TeamInvitationAttributes>;
+export type TeamInvitationModel = ModelDefined<TeamInvitationAttributes, Omit<TeamInvitationAttributes, 'id'>>;
 
 export default (database: Sequelize): TeamInvitationModel => {
   const TeamInvitation: TeamInvitationModel = database.define(
@@ -21,10 +21,10 @@ export default (database: Sequelize): TeamInvitationModel => {
         allowNull: false,
         autoIncrement: true,
       },
-      id_team: DataTypes.INTEGER,
+      idTeam: DataTypes.INTEGER,
       user: DataTypes.STRING,
       token: DataTypes.STRING,
-      bridge_password: DataTypes.STRING,
+      bridgePassword: DataTypes.STRING,
       mnemonic: DataTypes.STRING,
     },
     {
