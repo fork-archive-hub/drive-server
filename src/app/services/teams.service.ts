@@ -1,39 +1,82 @@
 import axios from 'axios';
+import { randomBytes } from 'crypto';
 
 import { getGatewayCredentials } from '../../config/environments/env';
 import { TeamAttributes } from '../models/team';
+import { TeamInvitationAttributes } from '../models/teaminvitation';
 import { TeamsRepository } from '../repositories/teams.repository';
+import { TeamsInvitationsRepository } from '../repositories/teamsInvitations.repository';
 import { TeamsMembersRepository } from '../repositories/teamsMembers.repository';
 
 export class MemberAlreadyInOtherTeamError extends Error {
   constructor() {
     super('Member is already in other team');
+
+    // see https://github.com/microsoft/TypeScript/issues/13965#issuecomment-278570200
+    Object.setPrototypeOf(this, MemberAlreadyInOtherTeamError.prototype);
   }
 }
 
 export class TeamNotFoundError extends Error {
   constructor() {
     super('Team not found');
+
+    // see https://github.com/microsoft/TypeScript/issues/13965#issuecomment-278570200
+    Object.setPrototypeOf(this, TeamNotFoundError.prototype);
   }
 }
 
 export class UserDoesNotHaveTeamError extends Error {
   constructor() {
     super('User does not have team');
+
+    // see https://github.com/microsoft/TypeScript/issues/13965#issuecomment-278570200
+    Object.setPrototypeOf(this, UserDoesNotHaveTeamError.prototype);
+  }
+}
+
+export class TeamInvitationNotFound extends Error {
+  constructor() {
+    super('Team invitation not found');
+
+    // see https://github.com/microsoft/TypeScript/issues/13965#issuecomment-278570200
+    Object.setPrototypeOf(this, TeamInvitationNotFound.prototype);
   }
 }
 
 export class TeamsService {
   private readonly teamsRepository: TeamsRepository;
   private readonly teamsMembersRepository: TeamsMembersRepository;
+  private readonly teamsInvitationsRepository: TeamsInvitationsRepository;
 
-  constructor(teamsRepository: TeamsRepository, teamsMembersRepository: TeamsMembersRepository) {
+  constructor(
+    teamsRepository: TeamsRepository, 
+    teamsMembersRepository: TeamsMembersRepository,
+    teamsInvitationsRepository: TeamsInvitationsRepository
+  ) {
     this.teamsRepository = teamsRepository;
     this.teamsMembersRepository = teamsMembersRepository;
+    this.teamsInvitationsRepository = teamsInvitationsRepository;
   }
 
   async updateAdminTeam(adminEmail: string, updatedData: Partial<TeamAttributes>): Promise<void> {
     await this.teamsRepository.updateOne(updatedData, { admin: adminEmail });
+  }
+
+  async getTeamById(teamId: number): Promise<TeamAttributes> {
+    const team = await this.teamsRepository.findOne({ id: teamId });
+
+    if (!team) {
+      throw new TeamNotFoundError();
+    }
+
+    return team;
+  }
+
+  async teamExists(teamId: number): Promise<boolean> {
+    const team = await this.teamsRepository.findOne({ id: teamId });
+
+    return !!team;
   }
 
   async getTeamByBridgeUser(bridgeUser: string): Promise<TeamAttributes> {
@@ -135,5 +178,41 @@ export class TeamsService {
       bridgePassword: networkPassword,
       bridgeMnemonic: mnemonic
     });
+  }
+
+  async getTeamInvitationByToken(token: string): Promise<TeamInvitationAttributes> {
+    const invitation = await this.teamsInvitationsRepository.findOne({ token });
+
+    if (!invitation) {
+      throw new TeamInvitationNotFound();
+    }
+
+    return invitation;
+  }
+
+  async destroyTeamInvitation(invitationId: number, userEmail: string): Promise<void> {
+    await this.teamsInvitationsRepository.deleteOne({
+      id: invitationId,
+      user: userEmail
+    });
+  }
+
+  async createTeamInvitation(
+    teamId: number, 
+    emailOfUserInvited: string, 
+    networkPassword: string, 
+    mnemonic: string
+  ): Promise<string> {
+    const token = randomBytes(20).toString('hex');
+
+    await this.teamsInvitationsRepository.create({
+      idTeam: teamId,
+      user: emailOfUserInvited,
+      bridgePassword: networkPassword,
+      mnemonic,
+      token
+    });
+
+    return token;
   }
 }

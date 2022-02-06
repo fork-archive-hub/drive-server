@@ -5,6 +5,7 @@ import { Stripe } from 'stripe';
 
 import { TeamsRepository } from '../repositories/teams.repository';
 import { TeamsMembersRepository } from '../repositories/teamsMembers.repository';
+import { TeamsInvitationsRepository } from '../repositories/teamsInvitations.repository';
 import { TeamsService } from './teams.service';
 import { PaymentsService } from './payments.service';
 import { PaymentsRepository } from '../repositories/payments.repository';
@@ -16,9 +17,14 @@ const StripeTest = new Stripe(process.env.STRIPE_SK_TEST, { apiVersion: '2020-08
 const basename = path.basename(__filename);
 
 function loadServices(models, services) {
+  const teamsInvitationsRepository = new TeamsInvitationsRepository(models);
   const teamsMembersRepository = new TeamsMembersRepository(models);
   const teamsRepository = new TeamsRepository(models);
-  const teamsService = new TeamsService(teamsRepository, teamsMembersRepository);
+  const teamsService = new TeamsService(
+    teamsRepository, 
+    teamsMembersRepository, 
+    teamsInvitationsRepository
+  );
   services['teamsService'] = teamsService;
 
   const paymentsRepository = new PaymentsRepository(isProduction() ? StripeProduction : StripeTest);
