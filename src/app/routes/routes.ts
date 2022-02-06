@@ -27,6 +27,7 @@ import * as ReCaptchaV3 from '../../lib/recaptcha';
 import * as AnalyticsService from '../../lib/analytics/AnalyticsService';
 import { UserAttributes } from '../models/user';
 import { AuthorizedUser } from './types';
+import { TeamNotFoundError, UserDoesNotHaveTeamError } from '../services/teams.service';
 
 const Logger = logger.getInstance();
 
@@ -139,7 +140,12 @@ export default (router: Router, service: any, App: any): Router => {
     }
 
     const keys = await service.KeyServer.getKeys(userData);
-    const team = await service.teamsService.getMemberTeam(req.body.email);
+    const team = await service.teamsService.getMemberTeam(req.body.email).catch((err: Error) => {
+      if (err instanceof UserDoesNotHaveTeamError || err instanceof TeamNotFoundError) {
+        return null;
+      } 
+      throw err;
+    });
     const hasTeams = !!team;
     const appSumoDetails = await service.AppSumo.GetDetails(userData.id).catch(() => null);
 
