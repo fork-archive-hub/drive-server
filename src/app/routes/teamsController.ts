@@ -10,7 +10,8 @@ import {
   MemberAlreadyInOtherTeamError, 
   TeamInvitationNotFound, 
   TeamNotFoundError, 
-  TeamsService 
+  TeamsService, 
+  UnauthorizedRemovalAttempt
 } from '../services/teams.service';
 import { TeamAttributes } from '../models/team';
 
@@ -167,25 +168,6 @@ class TeamsController {
     }
   }
 
-  async getTeamByMember(req: Request, res: Response) {
-    const userEmail = req.params.user;
-
-    this.service.Team.getIdTeamByUser(userEmail)
-      .then((team: any) => {
-        this.service.Team.getTeamById(team.id_team)
-          .then((team2: any) => {
-            res.status(200).json(team2.dataValues);
-          })
-          .catch(() => {
-            logger.error('Error: Team not exists');
-          });
-      })
-      .catch((err: Error) => {
-        logger.error('Error: This user %s not is a member', userEmail);
-        res.status(500).json(err);
-      });
-  }
-
   async getTeamMembers(req: Request, res: Response) {
     const user = (req as AuthorizedRequest).user.email;
     try {
@@ -199,16 +181,21 @@ class TeamsController {
   }
 
   async removeTeamMember(req: Request, res: Response) {
-    const removeUser = req.body.item.user;
-    const teamInfo = await this.service.Team.getTeamByEmail((req as AuthorizedRequest).user.email);
-    if (!teamInfo) {
-      res.status(500).send({ info: 'You not have permissions' });
-    }
-    const deleteMember = await this.service.TeamsMembers.removeMembers(removeUser);
-    if (deleteMember === 1) {
-      res.status(200).send({ info: 'Successfully member deleted' });
-    } else {
-      res.status(500).send({ err: 'Error, the member can not be deleted' });
+    const emailOfUserToRemove = req.body.user;
+    const userRequestingRemoval = (req as AuthorizedRequest).user.email;
+
+    try {
+      await this.service.teamsService.removeTeamMember(
+        emailOfUserToRemove,
+        userRequestingRemoval
+      );
+
+      return res.status(200).send();
+    } catch (err) {
+      if (err instanceof UnauthorizedRemovalAttempt) {
+        return res.status(403).send({ message: 'Not allowed to remove members' });
+      }
+      throw err;
     }
   }
 
@@ -249,9 +236,6 @@ class TeamsController {
   }
 
   async getTeamInfo(req: Request, res: Response) {
-    console.log('get team info');
-    console.log('user email', (req as AuthorizedRequest).user.email);
-
     const userEmail = (req as AuthorizedRequest).user.email;
     
     const team = await this.service.teamsService.getMemberTeam(userEmail);
@@ -355,7 +339,6 @@ export default (router: Router, service: any, app: any) => {
 
   router.post('/teams/team/invitations', passportAuth, controller.sendTeamInvitation.bind(controller));
   router.post('/teams/join/:token', controller.joinTeam.bind(controller)); 
-  router.get('/teams-members/:user', passportAuth, controller.getTeamByMember.bind(controller));
   router.get('/teams/members', passportAuth, controller.getTeamMembers.bind(controller));
   router.delete('/teams/member', passportAuth, controller.removeTeamMember.bind(controller));
   router.delete('/teams/invitation', passportAuth, controller.removeTeamInvitation.bind(controller));

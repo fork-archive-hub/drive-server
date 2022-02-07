@@ -44,6 +44,15 @@ export class TeamInvitationNotFound extends Error {
   }
 }
 
+export class UnauthorizedRemovalAttempt extends Error {
+  constructor() {
+    super('User not authorized to remove members');
+
+    // see https://github.com/microsoft/TypeScript/issues/13965#issuecomment-278570200
+    Object.setPrototypeOf(this, TeamInvitationNotFound.prototype);
+  }
+}
+
 export class TeamsService {
   private readonly teamsRepository: TeamsRepository;
   private readonly teamsMembersRepository: TeamsMembersRepository;
@@ -97,6 +106,19 @@ export class TeamsService {
     }
 
     return team;
+  }
+
+  async removeTeamMember(emailOfUserToRemove: string, emailOfUserRequestingRemoval: string): Promise<void> {
+    const team = await this.teamsRepository.findOne({ admin: emailOfUserRequestingRemoval });
+
+    if (!team) {
+      throw new UnauthorizedRemovalAttempt();
+    }
+
+    await this.teamsMembersRepository.deleteOne({
+      idTeam: team.id,
+      user: emailOfUserToRemove
+    });
   }
 
   async getMemberTeam(memberEmail: string): Promise<TeamAttributes> {

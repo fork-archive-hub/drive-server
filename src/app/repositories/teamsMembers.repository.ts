@@ -18,4 +18,8 @@ export class TeamsMembersRepository {
   async create(data: Omit<TeamsMembersAttributes, 'id'>): Promise<void> {
     await this.models.teamsmembers.create(data);
   }
+
+  async deleteOne(where: Partial<TeamsMembersAttributes>) {
+    await this.models.teamsmembers.destroy({ where, limit: 1 });
+  }
 }
