@@ -15,6 +15,12 @@ export class TeamsMembersRepository {
     return teamMember?.toJSON() as TeamsMembersAttributes | null;
   }
 
+  async find(where: Partial<TeamsMembersAttributes>): Promise<TeamsMembersAttributes[]> {
+    const teamMembers = await this.models.teamsmembers.findAll({ where });
+
+    return (teamMembers?.map(member => member.toJSON()) || []) as TeamsMembersAttributes[];
+  }
+
   async create(data: Omit<TeamsMembersAttributes, 'id'>): Promise<void> {
     await this.models.teamsmembers.create(data);
   }

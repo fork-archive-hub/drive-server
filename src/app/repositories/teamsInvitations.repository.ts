@@ -10,9 +10,15 @@ export class TeamsInvitationsRepository {
   }
 
   async findOne(where: Partial<TeamInvitationAttributes>): Promise<TeamInvitationAttributes | null> {
-    const teamMember = await this.models.teamsinvitations.findOne({ where });
+    const teamInvitation = await this.models.teamsinvitations.findOne({ where });
 
-    return teamMember?.toJSON() as TeamInvitationAttributes | null;
+    return teamInvitation?.toJSON() as TeamInvitationAttributes | null;
+  }
+
+  async find(where: Partial<TeamInvitationAttributes>): Promise<TeamInvitationAttributes[]> {
+    const teamInvitations = await this.models.teamsinvitations.findAll({ where });
+
+    return (teamInvitations?.map(invitation => invitation.toJSON()) || []) as TeamInvitationAttributes[];
   }
 
   async create(data: Omit<TeamInvitationAttributes, 'id'>): Promise<void> {
