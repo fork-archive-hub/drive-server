@@ -3,7 +3,7 @@ import _ from 'lodash';
 import mail from '@sendgrid/mail';
 
 import { UserAttributes } from '../models/user';
-import { passportAuth, Sign } from '../middleware/passport';
+import { passportAuth, sign, Sign } from '../middleware/passport';
 import Logger from '../../lib/logger';
 import { PaymentsService, TeamsNotPaidError } from '../services/payments.service';
 import { 
@@ -180,6 +180,10 @@ class TeamsController {
     }
   }
 
+  // async getTeamInvitations(req: Request, res: Response) {
+  //   const user = 
+  // }
+
   async removeTeamMember(req: Request, res: Response) {
     const emailOfUserToRemove = req.body.user;
     const userRequestingRemoval = (req as AuthorizedRequest).user.email;
@@ -200,16 +204,22 @@ class TeamsController {
   }
 
   async removeTeamInvitation(req: Request, res: Response) {
-    const removeUser = req.body.item.user;
-    const teamInfo = await this.service.Team.getTeamByEmail((req as AuthorizedRequest).user.email);
-    if (!teamInfo) {
-      res.status(500).send({ info: 'You not have permissions' });
-    }
-    const deleteInvitation = await this.service.TeamInvitations.removeInvitations(removeUser);
-    if (deleteInvitation === 1) {
-      res.status(200).send({ info: 'Successfully invitation deleted' });
-    } else {
-      res.status(500).send({ err: 'Error, the invitation can not be deleted' });
+    const invitationId = parseInt(req.params.id);
+    const userRequestingRemoval = (req as AuthorizedRequest).user.email;
+
+    try {
+      await this.service.teamsService.requestTeamInvitationDestroy(
+        invitationId,
+        userRequestingRemoval
+      );
+
+      return res.status(200).send();
+    } catch (err) {
+      if (err instanceof UnauthorizedRemovalAttempt) {
+        return res.status(403).send({ message: 'Not authorized to remove invitations' });
+      }
+
+      throw err;
     }
   }
 
@@ -239,12 +249,7 @@ class TeamsController {
     const userEmail = (req as AuthorizedRequest).user.email;
     
     const team = await this.service.teamsService.getMemberTeam(userEmail);
-    const internxtClient = req.headers['internxt-client'];
-    const tokenTeams = Sign(
-      team.bridgeUser, 
-      this.app.config.get('secrets').JWT, 
-      internxtClient === 'drive-web'
-    );
+    const tokenTeams = sign(team, this.app.config.get('secrets').JWT, );
 
     const user = await this.service.User.FindUserByEmail(team.bridgeUser);
     const userBucket = await this.service.User.GetUserBucket(user);
@@ -341,7 +346,7 @@ export default (router: Router, service: any, app: any) => {
   router.post('/teams/join/:token', controller.joinTeam.bind(controller)); 
   router.get('/teams/members', passportAuth, controller.getTeamMembers.bind(controller));
   router.delete('/teams/member', passportAuth, controller.removeTeamMember.bind(controller));
-  router.delete('/teams/invitation', passportAuth, controller.removeTeamInvitation.bind(controller));
+  router.delete('/teams/invitation/:id', passportAuth, controller.removeTeamInvitation.bind(controller));
   router.post('/teams/deleteAccount', passportAuth, controller.deleteTeamAccount.bind(controller));
   router.get('/teams/info', passportAuth, controller.getTeamInfo.bind(controller));
   router.get('/teams/team/info', passportAuth, controller.getTeam.bind(controller));

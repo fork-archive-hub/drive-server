@@ -9,7 +9,12 @@ function Sign(data, secret, useNewToken = false) {
   return token;
 }
 
+function sign(payload, secret) {
+  return jwt.sign(payload, secret, { expiresIn: '14d' });
+}
+
 module.exports = {
   passportAuth,
   Sign,
+  sign
 };

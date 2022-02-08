@@ -20,7 +20,7 @@ import UsersReferralsRoutes from './usersReferrals';
 import NewsletterRoutes from './newsletter';
 import UserRoutes from './user';
 import AnalyticsRoutes from './analytics';
-import { Sign, passportAuth } from '../middleware/passport';
+import { Sign, passportAuth, sign } from '../middleware/passport';
 import TeamsRoutes from './teamsController';
 import logger from '../../lib/logger';
 import * as ReCaptchaV3 from '../../lib/recaptcha';
@@ -179,7 +179,9 @@ export default (router: Router, service: any, App: any): Router => {
     };
 
     if (hasTeams) {
-      const tokenTeam = Sign(team.bridgeUser, App.config.get('secrets').JWT, internxtClient === 'drive-web');
+      const tokenTeam = sign(team, App.config.get('secrets').JWT);
+
+      console.log('tokenTeam', tokenTeam);
 
       return res.status(200).json({
         user, token, userTeam: team, tokenTeam
