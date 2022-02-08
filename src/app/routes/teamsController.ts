@@ -8,10 +8,12 @@ import Logger from '../../lib/logger';
 import { PaymentsService, TeamsNotPaidError } from '../services/payments.service';
 import { 
   MemberAlreadyInOtherTeamError, 
-  TeamInvitationNotFound, 
+  TeamInvitationNotFoundError, 
+  TeamMemberLimitReachedError, 
   TeamNotFoundError, 
   TeamsService, 
-  UnauthorizedRemovalAttempt
+  UnauthorizedRemovalAttemptError,
+  UserNotFoundError
 } from '../services/teams.service';
 import { TeamAttributes } from '../models/team';
 
@@ -42,13 +44,26 @@ class TeamsController {
 
   // TODO: team any: what is this??
   async sendTeamInvitation(req: Request, res: Response) {
+    const adminEmail = (req as AuthorizedRequest).user.email;
     const { email, bridgePass: bridgePassword, mnemonicTeam: teamMnemonic } = req.body;
-    const user = (req as AuthorizedRequest).user.email;
 
-    const team = await this.service.teamsService.getTeamByBridgeUser(user);
-    const totalUsers = await this.service.TeamsMembers.getPeople(team.id);
+    try {
+      await this.service.teamsService.sendTeamInvitation(adminEmail, email);
+    } catch (err) {
+      if (err instanceof TeamMemberLimitReachedError) {
+        return res.status(402).send({ message: 'Team members limit reached' });
+      } 
 
-    if (totalUsers.length >= team.totalMembers) {
+      if (err instanceof UserNotFoundError) {
+        return res.status(404).send({ message: 'This user does not have an Internxt account' });
+      }
+    }
+    
+
+    const team = await this.service.teamsService.getAdminTeam(adminEmail);
+    const teamMembers = await this.service.TeamsMembers.getPeople(team.id);
+
+    if (teamMembers.length >= team.totalMembers) {
       return res.status(402).send({ error: `You cannot exceed the limit of ${team.totalMembers} members` });
     }
 
@@ -63,7 +78,7 @@ class TeamsController {
     if (!keysExist) {
       logger.error(
         'User %s invited user %s to join the team, but this user has not server keys', 
-        user, 
+        adminEmail, 
         userToInvite.email
       );
 
@@ -82,29 +97,21 @@ class TeamsController {
       return res.status(200).send();
     }
 
-    const teamUser = await this.service.Team.getIdTeamByUser(email);
+    const teamUser = await this.service.teamsService.getMemberTeam(email);
 
     if (teamUser) {
       return res.status(200).send({ message: 'User already joined this team' });
     }
 
-    const teamToJoin = await this.service.Team.getTeamBridgeUser(user);
-
-    if (!teamToJoin) {
-      logger.error('Team %s was not initialized properly on the network', team.id);
-
-      return res.status(409).send({ message: 'There is an issue with this Teams account' });
-    }
-
     const invitationToken = await this.service.teamsService.createTeamInvitation(
-      teamToJoin.id,
+      team.id,
       email,
       bridgePassword,
       teamMnemonic
     );
 
     await this.service.Mail.sendEmailTeamsMember(userToInvite.name, email, invitationToken, (req as any).team);
-    logger.info('User %s invites %s to join the team', user, email);
+    logger.info('User %s invites %s to join the team', adminEmail, email);
     res.status(200).send({});
   }
 
@@ -161,7 +168,7 @@ class TeamsController {
 
       res.status(200).send();
     } catch (err) {
-      if (err instanceof TeamInvitationNotFound) {
+      if (err instanceof TeamInvitationNotFoundError) {
         return res.status(404).send();
       }
       throw err;
@@ -188,6 +195,11 @@ class TeamsController {
     const emailOfUserToRemove = req.body.user;
     const userRequestingRemoval = (req as AuthorizedRequest).user.email;
 
+    console.log('emailOfUserToRemove', emailOfUserToRemove);
+    console.log('userRequestingRemoval', userRequestingRemoval);
+
+    return res.status(400).send({ message: 'fuck you' });
+
     try {
       await this.service.teamsService.removeTeamMember(
         emailOfUserToRemove,
@@ -196,7 +208,7 @@ class TeamsController {
 
       return res.status(200).send();
     } catch (err) {
-      if (err instanceof UnauthorizedRemovalAttempt) {
+      if (err instanceof UnauthorizedRemovalAttemptError) {
         return res.status(403).send({ message: 'Not allowed to remove members' });
       }
       throw err;
@@ -207,6 +219,9 @@ class TeamsController {
     const invitationId = parseInt(req.params.id);
     const userRequestingRemoval = (req as AuthorizedRequest).user.email;
 
+    console.log('emailOfUserToRemove', invitationId);
+    console.log('userRequestingRemoval', userRequestingRemoval);
+
     try {
       await this.service.teamsService.requestTeamInvitationDestroy(
         invitationId,
@@ -215,7 +230,7 @@ class TeamsController {
 
       return res.status(200).send();
     } catch (err) {
-      if (err instanceof UnauthorizedRemovalAttempt) {
+      if (err instanceof UnauthorizedRemovalAttemptError) {
         return res.status(403).send({ message: 'Not authorized to remove invitations' });
       }
 
@@ -247,9 +262,12 @@ class TeamsController {
 
   async getTeamInfo(req: Request, res: Response) {
     const userEmail = (req as AuthorizedRequest).user.email;
+    console.log('userEmail', userEmail);
     
     const team = await this.service.teamsService.getMemberTeam(userEmail);
-    const tokenTeams = sign(team, this.app.config.get('secrets').JWT, );
+    const tokenTeams = sign({ ...team, email: userEmail }, this.app.config.get('secrets').JWT);
+
+    console.log('tokenTeams', JSON.stringify(tokenTeams, null, 2));
 
     const user = await this.service.User.FindUserByEmail(team.bridgeUser);
     const userBucket = await this.service.User.GetUserBucket(user);

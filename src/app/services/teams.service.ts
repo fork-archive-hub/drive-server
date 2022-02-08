@@ -36,21 +36,58 @@ export class UserDoesNotHaveTeamError extends Error {
   }
 }
 
-export class TeamInvitationNotFound extends Error {
+export class TeamInvitationNotFoundError extends Error {
   constructor() {
     super('Team invitation not found');
 
     // see https://github.com/microsoft/TypeScript/issues/13965#issuecomment-278570200
-    Object.setPrototypeOf(this, TeamInvitationNotFound.prototype);
+    Object.setPrototypeOf(this, TeamInvitationNotFoundError.prototype);
   }
 }
 
-export class UnauthorizedRemovalAttempt extends Error {
+export class UnauthorizedRemovalAttemptError extends Error {
   constructor() {
     super('User not authorized to remove members');
 
     // see https://github.com/microsoft/TypeScript/issues/13965#issuecomment-278570200
-    Object.setPrototypeOf(this, TeamInvitationNotFound.prototype);
+    Object.setPrototypeOf(this, UnauthorizedRemovalAttemptError.prototype);
+  }
+}
+
+export class UnauthorizedSendInvitationAttemptError extends Error {
+  constructor() {
+    super('User not authorized to send invitations');
+
+    // see https://github.com/microsoft/TypeScript/issues/13965#issuecomment-278570200
+    Object.setPrototypeOf(this, UnauthorizedSendInvitationAttemptError.prototype);
+  }
+}
+
+export class TeamMemberLimitReachedError extends Error {
+  constructor() {
+    super('Team member limit reached');
+
+    // see https://github.com/microsoft/TypeScript/issues/13965#issuecomment-278570200
+    Object.setPrototypeOf(this, TeamMemberLimitReachedError.prototype);
+  }
+}
+
+// TODO: Move to user service when is refactored
+export class UserNotFoundError extends Error {
+  constructor() {
+    super('User not found');
+
+    // see https://github.com/microsoft/TypeScript/issues/13965#issuecomment-278570200
+    Object.setPrototypeOf(this, UserNotFoundError.prototype);
+  }
+}
+
+export class UserHasMissingKeysError extends Error {
+  constructor() {
+    super('User not found');
+
+    // see https://github.com/microsoft/TypeScript/issues/13965#issuecomment-278570200
+    Object.setPrototypeOf(this, UserHasMissingKeysError.prototype);
   }
 }
 
@@ -58,15 +95,18 @@ export class TeamsService {
   private readonly teamsRepository: TeamsRepository;
   private readonly teamsMembersRepository: TeamsMembersRepository;
   private readonly teamsInvitationsRepository: TeamsInvitationsRepository;
+  private readonly legacyServices: any;
 
   constructor(
     teamsRepository: TeamsRepository, 
     teamsMembersRepository: TeamsMembersRepository,
-    teamsInvitationsRepository: TeamsInvitationsRepository
+    teamsInvitationsRepository: TeamsInvitationsRepository,
+    legacyServices: any
   ) {
     this.teamsRepository = teamsRepository;
     this.teamsMembersRepository = teamsMembersRepository;
     this.teamsInvitationsRepository = teamsInvitationsRepository;
+    this.legacyServices = legacyServices;
   }
 
   async updateAdminTeam(adminEmail: string, updatedData: Partial<TeamAttributes>): Promise<void> {
@@ -113,13 +153,86 @@ export class TeamsService {
     const team = await this.teamsRepository.findOne({ admin: emailOfUserRequestingRemoval });
 
     if (!team) {
-      throw new UnauthorizedRemovalAttempt();
+      throw new UnauthorizedRemovalAttemptError();
     }
 
     await this.teamsMembersRepository.deleteOne({
       idTeam: team.id,
       user: emailOfUserToRemove
     });
+  }
+
+  async sendTeamInvitation(
+    adminEmail: string, 
+    emailOfUserToInvite: string
+  ): Promise<void> {
+    const teamToJoin = await this.teamsRepository.findOne({ admin: adminEmail });
+    const isAdmin = !!teamToJoin;
+
+    if (!isAdmin) {
+      throw new UnauthorizedSendInvitationAttemptError();
+    }
+
+    const teamMembers = await this.teamsMembersRepository.find({
+      idTeam: teamToJoin.id
+    });
+
+    if (teamMembers.length >= teamToJoin.totalMembers) {
+      throw new TeamMemberLimitReachedError();
+    }
+
+    const userToInvite = await this.legacyServices.User.FindUserByEmail(
+      emailOfUserToInvite
+    );
+
+    if (!userToInvite) {
+      throw new UserNotFoundError();
+    }
+
+    const userToInviteHasKeys = await this.legacyServices.KeyServer.keysExists(
+      userToInvite
+    );
+
+    if (!userToInviteHasKeys) {
+      throw new UserHasMissingKeysError();
+    }
+
+    const teamMember = await this.teamsMembersRepository.findOne({
+      user: emailOfUserToInvite
+    });
+
+    const userIsAlreadyInATeam = !!teamMember;
+
+    if (userIsAlreadyInATeam) {
+      if (teamMember.idTeam === teamToJoin.id) {
+        return;
+      }
+      throw new MemberAlreadyInOtherTeamError();
+    }
+
+    const invitation = await this.teamsInvitationsRepository.findOne({
+      user: emailOfUserToInvite
+    });
+    const alreadyInvited = !!invitation;
+    let invitationToken: string;
+
+    if (alreadyInvited) {
+      invitationToken = invitation.token;
+    } else {
+      invitationToken = await this.createTeamInvitation(
+        teamToJoin.id,
+        emailOfUserToInvite,
+        teamToJoin.bridgePassword,
+        teamToJoin.bridgeMnemonic
+      );
+    }
+
+    return this.legacyServices.Mail.sendEmailTeamsMember(
+      userToInvite.name,
+      emailOfUserToInvite,
+      invitationToken,
+      teamToJoin.name
+    );
   }
 
   async getMemberTeam(memberEmail: string): Promise<TeamAttributes> {
@@ -207,7 +320,7 @@ export class TeamsService {
     const invitation = await this.teamsInvitationsRepository.findOne({ token });
 
     if (!invitation) {
-      throw new TeamInvitationNotFound();
+      throw new TeamInvitationNotFoundError();
     }
 
     return invitation;
@@ -227,7 +340,7 @@ export class TeamsService {
     const team = await this.teamsRepository.findOne({ admin: emailOfUserRequestingRemoval });
 
     if (!team) {
-      throw new UnauthorizedRemovalAttempt();
+      throw new UnauthorizedRemovalAttemptError();
     }
 
     await this.teamsInvitationsRepository.deleteOne({
