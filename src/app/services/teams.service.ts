@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import { getGatewayCredentials } from '../../config/environments/env';
 import { TeamAttributes } from '../models/team';
 import { TeamInvitationAttributes } from '../models/teaminvitation';
+import { TeamsMembersAttributes } from '../models/teammember';
 import { TeamsRepository } from '../repositories/teams.repository';
 import { TeamsInvitationsRepository } from '../repositories/teamsInvitations.repository';
 import { TeamsMembersRepository } from '../repositories/teamsMembers.repository';
@@ -219,6 +220,22 @@ export class TeamsService {
     });
   }
 
+  async requestTeamInvitationDestroy(
+    invitationId: number,
+    emailOfUserRequestingRemoval: string, 
+  ): Promise<void> {
+    const team = await this.teamsRepository.findOne({ admin: emailOfUserRequestingRemoval });
+
+    if (!team) {
+      throw new UnauthorizedRemovalAttempt();
+    }
+
+    await this.teamsInvitationsRepository.deleteOne({
+      id: invitationId,
+      idTeam: team.id
+    });
+  }
+
   async createTeamInvitation(
     teamId: number, 
     emailOfUserInvited: string, 
@@ -236,5 +253,13 @@ export class TeamsService {
     });
 
     return token;
+  }
+
+  getTeamMembers(teamId: number): Promise<TeamsMembersAttributes[]> {
+    return this.teamsMembersRepository.find({ id: teamId });
+  }
+
+  getTeamInvitations(teamId: number): Promise<TeamInvitationAttributes[]> {
+    return this.teamsInvitationsRepository.find({ id: teamId });
   }
 }
